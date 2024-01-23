@@ -48,7 +48,7 @@ def torch_version_str_compare_lessequal(version1, version2):
 
 def main():
     args = parse_args()
-
+    
     # Set distributed group
     args.local_device_rank = max(args.local_rank, 0)
     torch.cuda.set_device(args.local_device_rank)
@@ -77,13 +77,14 @@ def main():
     setup_worker_logging(args.rank, log_queue, args.log_level)
 
     # Build the CLIP model
-    vision_model_config_file = f"clip/model_configs/{args.vision_model.replace('/', '-')}.json"
+    vision_model_config_file = f"uniclip/clip/model_configs/{args.vision_model.replace('/', '-')}.json"
     print('Loading vision model config from', vision_model_config_file)
     assert os.path.exists(vision_model_config_file)
 
-    text_model_config_file = f"clip/model_configs/{args.text_model.replace('/', '-')}.json"
+    text_model_config_file = f"uniclip/clip/model_configs/{args.text_model.replace('/', '-')}.json"
     print('Loading text model config from', text_model_config_file)
     assert os.path.exists(text_model_config_file)
+    
     
     with open(vision_model_config_file, 'r') as fv, open(text_model_config_file, 'r') as ft:
         model_info = json.load(fv)

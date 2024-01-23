@@ -9,7 +9,6 @@ from PIL import Image
 import base64
 from io import BytesIO
 from dataclasses import dataclass
-import lmdb
 import pickle
 import random
 import numpy as np

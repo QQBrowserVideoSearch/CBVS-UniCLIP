@@ -8,7 +8,6 @@ import os
 import json
 import numpy as np
 import time
-import openpyxl
 from tqdm import tqdm
 import requests
 from PIL import Image

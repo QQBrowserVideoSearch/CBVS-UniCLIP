@@ -30,7 +30,7 @@ reset_optimizer="--reset-optimizer"
 
 # output options
 output_base_dir=output/
-name=exp_10m
+name=exp_5m
 
 # model config
 ocr_presence=1

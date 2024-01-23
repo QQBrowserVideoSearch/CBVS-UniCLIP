@@ -6,7 +6,7 @@ test_data=datasets/cbvs20k.txt
 resume=pretrained/UniCLIP-base.pt
 
 # inference output
-output_file=output/inference.txt
+output_file=output/inference_result.txt
 
 # model config
 ocr_presence=1

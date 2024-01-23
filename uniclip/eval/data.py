@@ -7,7 +7,6 @@ from PIL import Image
 import base64
 from io import BytesIO
 import torch
-import lmdb
 from torchvision.transforms import Compose, Resize, ToTensor, Normalize, InterpolationMode
 from torch.utils.data import Dataset, DataLoader, SubsetRandomSampler
 from torch.utils.data.distributed import DistributedSampler
@@ -65,7 +64,7 @@ class EvalDataset(Dataset):
 
             # from local
             # docid = text_id.split('\t')[-1]
-            # image = Image.open(f'/search/odin/xsqiao/UniOCR/Code/pnr_utils/imgs/{docid}.jpg')
+            # image = Image.open(f'datasets/cbvs20k/imgs/{docid}.jpg')
 
             image = self.preprocess(image)
         except Exception:
