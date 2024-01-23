@@ -400,7 +400,7 @@ class BertModel(BertPreTrainedModel):
             further processed by a Linear layer and a Tanh activation function. The Linear
             layer weights are trained from the next sentence prediction (classification)
             objective during Bert pretraining. This output is usually *not* a good summary
-            of the semantic content of the input, you're often better with averaging or pooling
+            of the semantic semantic of the input, you're often better with averaging or pooling
             the sequence of hidden-states for the whole input sequence.
         **hidden_states**: (`optional`, returned when ``config.output_hidden_states=True``)
             list of ``torch.FloatTensor`` (one for the output of each layer + the output of the embeddings)

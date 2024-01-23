@@ -113,6 +113,7 @@ class ModifiedResNet(nn.Module):
     - Performs anti-aliasing strided convolutions, where an avgpool is prepended to convolutions with stride > 1
     - The final pooling layer is a QKV attention instead of an average pool
     """
+
     def __init__(self, layers, output_dim, heads, input_resolution=224, width=64):
         super().__init__()
         self.output_dim = output_dim
@@ -246,6 +247,7 @@ class Transformer(nn.Module):
         self.resblocks = nn.Sequential(*[ResidualAttentionBlock(width, heads, attn_mask, use_flash_attention) for _ in range(layers)])
 
     def forward(self, x: torch.Tensor):
+        # print(x.shape) # torch.Size([197, 160, 768])
         if self.grad_checkpointing and not torch.jit.is_scripting():
             for r in self.resblocks:
                 x = checkpoint(r, x)
@@ -258,9 +260,12 @@ class TransformerDecoder(nn.Module):
         super().__init__()
         self.width = width
         self.layers = layers
+        # self.resblocks = nn.Sequential(*[ResidualAttentionBlockDecoder(width, heads, attn_mask, use_flash_attention) for _ in range(layers)])
         self.resblocks = nn.ModuleList([ResidualAttentionBlockDecoder(width, heads, attn_mask, use_flash_attention) for _ in range(layers)])
     
     def forward(self, tgt: torch.Tensor, memory: torch.Tensor):
+        # return self.resblocks(tgt, memory)
+        # print(tgt.shape) # torch.Size([160, 20, 768])
         for layer in self.resblocks:
             tgt = layer(tgt, memory)
         return tgt
@@ -297,6 +302,7 @@ class VisualTransformer(nn.Module):
         ids_keep = ids_shuffle[:, :len_keep]
 
         x_masked = torch.gather(x, dim=1, index=ids_keep.unsqueeze(-1).repeat(1, 1, D))
+
         x0 = x[:, 0, :]
         x0 = x0.reshape(N, 1, D)
         x_masked_add = torch.cat([x0, x_masked], axis=1)
@@ -320,7 +326,6 @@ class VisualTransformer(nn.Module):
         all_features = x
 
         x = self.ln_post(x[:, 0, :])
-
         if self.proj is not None:
             x = x @ self.proj
         return x, all_features
@@ -392,9 +397,12 @@ class CLIP(nn.Module):
             use_flash_attention=use_flash_attention
         )
         self.bert = BertModel(self.bert_config)
+
         self.text_projection = nn.Parameter(torch.empty(text_hidden_size, embed_dim))
         self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
+
         self.tokenizer = tokenizer
+
         scale = vision_width ** -0.5
         self.ocr_presence=ocr_presence
         self.ocr_semantic=ocr_semantic
@@ -405,18 +413,18 @@ class CLIP(nn.Module):
             self.proj_ocr_presence = nn.Parameter(torch.randn(vision_width, 2))
             
         if self.ocr_semantic:
-            self.decoder_class_embedding = nn.Parameter(scale * torch.randn(vision_width))
             self.bert_embedding = BertEmbeddings(self.bert_config)
             self.ocr_semantic_decoder = TransformerDecoder(vision_width, layers=3, heads=vision_heads, use_flash_attention=use_flash_attention)
             self.ln_ocr_semantic = LayerNorm(vision_width)
             self.proj_ocr_semantic = nn.Parameter(torch.randn(vision_width, 2))
+            self.decoder_class_embedding = nn.Parameter(scale * torch.randn(vision_width))
 
         self.initialize_parameters()
 
 
-
     def initialize_parameters(self):
         self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
+
         if isinstance(self.visual, ModifiedResNet):
             if self.visual.attnpool is not None:
                 std = self.visual.attnpool.c_proj.in_features ** -0.5
@@ -444,6 +452,7 @@ class CLIP(nn.Module):
 
     def encode_image(self, image, mask_ratio=0):
         if isinstance(self.visual, ModifiedResNet):
+            # mask_ratio > 0 (FLIP strategy) is currently only implemented for VisualTransformer.
             return self.visual(image.type(self.dtype))
         return self.visual(image.type(self.dtype), mask_ratio)
 
@@ -454,9 +463,9 @@ class CLIP(nn.Module):
         x = self.bert(text, attention_mask=attn_mask)[0].type(self.dtype) # [batch_size, seq_length, hidden_size]
         return x[:, 0, :] @ self.text_projection
 
+
     def forward(self, image, text, fake_ocrs=None, mask_ratio=0):
         assert image is not None or text is not None, "text and image cannot both be None!"
-        
         if image is None:
             return self.encode_text(text)
         elif text is None:
@@ -464,65 +473,7 @@ class CLIP(nn.Module):
             
         image_features, raw_features = self.encode_image(image, mask_ratio)
         text_features = self.encode_text(text)
-
-        image_features = image_features / image_features.norm(dim=-1, keepdim=True)
-        text_features = text_features / text_features.norm(dim=-1, keepdim=True)
-
-        # from raw featrues, to predict whether ocr presences or not
-        if self.ocr_presence and not self.ocr_semantic:
-            raw_features = raw_features.permute(1, 0, 2)  # NLD -> LND
-            raw_features = self.ocr_presence_decoder(raw_features)
-            raw_features = raw_features.permute(1, 0, 2)  # LND -> NLD
-            raw_features = self.ln_ocr_presence(raw_features[:, 0, :])
-            ocr_presence_est = raw_features @ self.proj_ocr_presence
-
-            output = {'image_features': image_features,
-                    'text_features': text_features,
-                    'logit_scale': self.logit_scale.exp(),
-                    'ocr_presence_est': ocr_presence_est}
-            # ------------------------------------------------------------------------
-            return output
-        elif self.ocr_presence and self.ocr_semantic:
-            raw_features = raw_features.permute(1, 0, 2)  # NLD -> LND
-            fake_ocrs = self.bert_embedding(fake_ocrs)
-            fake_ocrs = torch.cat([self.decoder_class_embedding.to(fake_ocrs.dtype) + torch.zeros(fake_ocrs.shape[0], 1, fake_ocrs.shape[-1], dtype=fake_ocrs.dtype, device=fake_ocrs.device), fake_ocrs], dim=1)  # shape = [*, grid ** 2 + 1, width]
-            fake_ocrs = fake_ocrs.permute(1, 0, 2)
-            ocr_presence_features = self.ocr_presence_decoder(raw_features)
-            ocr_semantic_features = self.ocr_semantic_decoder(fake_ocrs, raw_features)
-            ocr_presence_features = ocr_presence_features.permute(1, 0, 2)  # LND -> NLD
-            ocr_semantic_features = ocr_semantic_features.permute(1, 0, 2)  # LND -> NLD
-            ocr_presence_features = self.ln_ocr_presence(ocr_presence_features[:, 0, :])
-            ocr_presence_est = ocr_presence_features @ self.proj_ocr_presence
-            ocr_semantic_features = self.ln_ocr_semantic(ocr_semantic_features[:, 0, :])
-            ocr_semantic_est = ocr_semantic_features @ self.proj_ocr_semantic
-
-            output = {'image_features': image_features,
-                    'text_features': text_features,
-                    'logit_scale': self.logit_scale.exp(),
-                    'ocr_presence_est': ocr_presence_est,
-                    'ocr_semantic_est': ocr_semantic_est
-                    }
-            return output
-        elif not self.ocr_presence and self.ocr_semantic:
-            raw_features = raw_features.permute(1, 0, 2)  # NLD -> LND
-            fake_ocrs = self.bert_embedding(fake_ocrs)
-            fake_ocrs = torch.cat([self.decoder_class_embedding.to(fake_ocrs.dtype) + torch.zeros(fake_ocrs.shape[0], 1, fake_ocrs.shape[-1], dtype=fake_ocrs.dtype, device=fake_ocrs.device), fake_ocrs], dim=1)  # shape = [*, grid ** 2 + 1, width]
-            fake_ocrs = fake_ocrs.permute(1, 0, 2)
-            ocr_semantic_features = self.ocr_semantic_decoder(fake_ocrs, raw_features)
-            ocr_semantic_features = ocr_semantic_features.permute(1, 0, 2)  # LND -> NLD
-            ocr_semantic_features = self.ln_ocr_semantic(ocr_semantic_features[:, 0, :])
-            ocr_semantic_est = ocr_semantic_features @ self.proj_ocr_semantic
-            
-            output = {'image_features': image_features,
-                    'text_features': text_features,
-                    'logit_scale': self.logit_scale.exp(),
-                    'ocr_semantic_est': ocr_semantic_est}
-            return output
-        else:
-            output = {'image_features': image_features,
-                    'text_features': text_features,
-                    'logit_scale': self.logit_scale.exp()}
-            return output            
+        return image_features, text_features
 
     def get_similarity(self, image, text):
         image_features = self.encode_image(image)

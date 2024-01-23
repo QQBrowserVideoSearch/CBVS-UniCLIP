@@ -19,13 +19,13 @@ def parse_args():
         "--train-data",
         type=str,
         required=True,
-        help="Path to the LMDB directory with training data split",
+        help="Path to the train file",
     )
     parser.add_argument(
         "--val-data",
         type=str,
         default=None,
-        help="Path to the LMDB directory with validation data split, default to None which disables validation",
+        help="Path to the eval file",
     )
     parser.add_argument(
         "--num-workers", type=int, default=2, help="The number of workers for training dataloader."
@@ -218,16 +218,16 @@ def parse_args():
         help="Random seed."
     )
     parser.add_argument(
-        "--ocr-exist", 
+        "--ocr-presence", 
         type=int, 
         default=0, 
-        help="Ocr exists or not."
+        help="Ocr presences or not."
     )
     parser.add_argument(
-        "--ocr-content", 
+        "--ocr-semantic", 
         type=int, 
         default=0, 
-        help="Ocr content or not."
+        help="Ocr semantic or not."
     )    
     args = parser.parse_args()
     args.aggregate = not args.skip_aggregate

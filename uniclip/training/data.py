@@ -9,13 +9,11 @@ from PIL import Image
 import base64
 from io import BytesIO
 from dataclasses import dataclass
-
 import lmdb
 import pickle
 import random
 import numpy as np
-
-
+import requests
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.distributed import DistributedSampler
@@ -28,69 +26,56 @@ from uniclip.clip import _tokenizer
 from uniclip.clip import tokenize
 
 
-
 def _convert_to_rgb(image):
     return image.convert('RGB')
 
 
 def _preprocess_text(text):
-    # adapt the text to Chinese BERT vocab
     text = text.lower().replace("“", "\"").replace("”", "\"")
     return text
 
 
-class LMDBDataset(Dataset):
-    def __init__(self, lmdb_path, split="val", max_txt_length=64, use_augment=False, resolution=224):
-        self.lmdb_path = lmdb_path
-
-        # assert LMDB directories exist
-        assert os.path.isdir(lmdb_path), "The LMDB directory {} of {} split does not exist!".format(lmdb_path, split)
-        lmdb_pairs = os.path.join(lmdb_path, "pairs")
-        assert os.path.isdir(lmdb_pairs), "The LMDB directory {} of {} image-text pairs does not exist!".format(lmdb_pairs, split)
-        lmdb_imgs = os.path.join(lmdb_path, "imgs")
-        assert os.path.isdir(lmdb_imgs), "The LMDB directory {} of {} image base64 strings does not exist!".format(lmdb_imgs, split)
-
-        # open LMDB files
-        self.env_pairs = lmdb.open(lmdb_pairs, readonly=True, create=False, lock=False, readahead=False, meminit=False)
-        self.txn_pairs = self.env_pairs.begin(buffers=True)
-        self.env_imgs = lmdb.open(lmdb_imgs, readonly=True, create=False, lock=False, readahead=False, meminit=False)
-        self.txn_imgs = self.env_imgs.begin(buffers=True)
-
-        # fetch number of pairs and images
-        self.number_samples = int(self.txn_pairs.get(key=b'num_samples').tobytes().decode('utf-8'))
-        self.number_images = int(self.txn_imgs.get(key=b'num_images').tobytes().decode('utf-8'))
-        logging.info("{} LMDB file contains {} images and {} pairs.".format(split, self.number_images, self.number_samples))
-
-        super(LMDBDataset, self).__init__()
-
-        # the self.dataset_len will be edited to a larger value by calling pad_dataset()
-        self.dataset_len = self.number_samples
-        
-        self.global_batch_size = 1 # will be modified to the exact global_batch_size after calling pad_dataset()
+class CBVSDataset(Dataset):
+    def __init__(self, cbvs_path, split="train", max_txt_length=64, use_augment=False, resolution=224):
+        super(CBVSDataset, self).__init__()
 
         self.split = split
         self.max_txt_length = max_txt_length        
-
         self.use_augment = use_augment
         self.transform = self._build_transform(resolution)
-
-        self.ocr_database = []     
+        
         self.sim_database = {}
+        self.ocr_database = []
 
         self.lac = LAC(mode='rank')
         
-        # OCR负样本
-        with open('/search/odin/1_ceceliali/8_mmfuse_model/1_data_mining/1_hnswlib_mining/1204_file_merge_query_distance', 'r') as fin: # 1000W
-            for line in fin:
+        # 数据集
+        self.titles = []
+        self.urls = []
+        self.ocrs = []
+
+        print('Loading CBVS dataset')
+        with open(cbvs_path, 'r') as fin:
+            for line in tqdm(fin):
                 li = line.strip().split('\t')
-                raw_ocr = li[0]
-                hard_ocr = li[1]
-                if raw_ocr not in self.sim_database:
-                    self.sim_database[raw_ocr] = [hard_ocr]
-                    self.ocr_database.append(raw_ocr)
-                else:
-                    if len(self.sim_database[raw_ocr]) < 10:
-                        self.sim_database[raw_ocr].append(hard_ocr)
+                if len(li) < 3:
+                    continue
+                title = li[0]
+                url = li[1]
+                ocr = li[2]
+                self.titles.append(title)
+                self.urls.append(url)
+                self.ocrs.append(ocr)
+        
+        # OCR负样本
+        print('Loading OCR samples')
+        with open('datasets/cbvs10m-HNSW', 'r') as fin:
+            for line in tqdm(fin):
+                li = line.strip().split('\t')
+                self.sim_database[li[0]] = li[1:]
+                self.ocr_database.append(li[0])
+        
+        self.dataset_len = len(self.titles)
 
 
     def _build_transform(self, resolution):
@@ -115,14 +100,10 @@ class LMDBDataset(Dataset):
             ])
         return transform
 
-    def __del__(self):
-        if hasattr(self, 'env_pairs'):
-            self.env_pairs.close()
-        if hasattr(self, 'env_imgs'):
-            self.env_imgs.close()
 
     def __len__(self):
-        return self.dataset_len
+        return len(self.titles)
+
 
     def get_core_terms(self, text):
         """
@@ -136,8 +117,7 @@ class LMDBDataset(Dataset):
 
         if rank_result and len(rank_result[0]) == 3:
             words = rank_result[0][0]  # 分词list
-            # pos_tags = rank_result[0][1]  # 词性list
-            term_weights = rank_result[0][2]  # 词重要度list: 3表示核心词
+            term_weights = rank_result[0][2]  # 词重要度list
 
             for index in range(len(words)):
                 if term_weights[index] > 2:
@@ -146,23 +126,15 @@ class LMDBDataset(Dataset):
         return core_terms
 
     def __getitem__(self, index):
-        sample_index = index % self.number_samples
-
-        pair = pickle.loads(self.txn_pairs.get("{}".format(sample_index).encode('utf-8')).tobytes())
-        image_id, text_id, raw_text = pair
-
         try:
-            image_b64 = self.txn_imgs.get("{}".format(image_id).encode('utf-8')).tobytes()
-            image_b64 = image_b64.decode(encoding="utf8", errors="ignore")
-
-            image = Image.open(BytesIO(base64.urlsafe_b64decode(image_b64))) # already resized
+            response = requests.get(self.urls[index])
+            image = Image.open(BytesIO(response.content))
             image = self.transform(image)
         except:
-            print('error img idx: ', image_id)
             image = torch.zeros((3, 224, 224))
         
-        query, ocr = raw_text.split('xiaozhequ')
-
+        query = self.titles[index]
+        ocr = self.ocrs[index]
 
         try:
             new_query = self.get_core_terms(query)
@@ -172,35 +144,33 @@ class LMDBDataset(Dataset):
         except Exception:
             pass
         
-        ocr_exists = 1 if ocr != 'Null' else 0
+        ocr_presences = 1 if ocr != '\\N' else 0
         query = tokenize([_preprocess_text(query)], context_length=self.max_txt_length)[0]
 
-
         # 随机在最接近的10个里面选择1个作为负样本
-        if ocr == 'Null':
+        if ocr == '\\N':
             fake_ocr = random.choice(self.ocr_database)
-            ocr_content = 0
+            ocr_semantic = 0
         else:
             if random.random() < 0.7:
                 fake_ocr = ocr
-                ocr_content = 1
+                ocr_semantic = 1
             else:
                 if ocr in self.sim_database:
                     fake_ocr = random.choice(self.sim_database[ocr])
-                    ocr_content = 1 if fake_ocr==ocr else 0
+                    ocr_semantic = 1 if fake_ocr==ocr else 0
                 else:
                     fake_ocr = ocr
-                    ocr_content = 1
+                    ocr_semantic = 1
 
         ocr =  tokenize([_preprocess_text(ocr)], context_length=20)[0]
         fake_ocr =  tokenize([_preprocess_text(fake_ocr)], context_length=20)[0]
         eos_index = query.numpy().tolist().index(_tokenizer.vocab['[SEP]'])
 
-        return image, query, ocr, ocr_exists, fake_ocr, ocr_content, eos_index
+        return image, query, ocr, ocr_presences, fake_ocr, ocr_semantic, eos_index
 
 
 def pad_dataset(dataset, global_batch_size):
-    # edit dataset.__len__() of the dataset
     dataset.dataset_len = ceil(dataset.dataset_len / global_batch_size) * global_batch_size
     dataset.global_batch_size = global_batch_size
 
@@ -217,7 +187,7 @@ def fetch_resolution(vision_model):
 class DataInfo:
     dataloader: DataLoader
     sampler: DistributedSampler
-    dataset: LMDBDataset
+    dataset: CBVSDataset
     epoch_id: int
 
 
@@ -228,7 +198,7 @@ def get_dataset(args, is_train, max_txt_length=64, epoch_id=0):
         db_path = args.val_data
     assert db_path is not None
 
-    dataset = LMDBDataset(
+    dataset = CBVSDataset(
         db_path, 
         split="train" if is_train else "val",
         max_txt_length=max_txt_length,
@@ -243,10 +213,6 @@ def get_dataset(args, is_train, max_txt_length=64, epoch_id=0):
     pad_dataset(dataset, global_batch_size)
 
     num_samples = dataset.dataset_len
-    # Update in 22.12.11: We have changed the **validation** dataset sampler during finetuning
-    # from sequential to shuffled (in a determistic order between experiments and epochs). 
-    # This is to avoid there being one text matching multiple images (or vice versa) in a local batch
-    # which will affect the correctness of computing the validation in-batch accuracy.
     sampler = DistributedSampler(dataset, shuffle=True, seed=args.seed)
     sampler.set_epoch(epoch_id if is_train else 0)
 

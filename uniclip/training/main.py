@@ -1,6 +1,5 @@
 from uniclip.training.data import get_data
 
-
 from math import ceil
 import os
 import logging
@@ -54,7 +53,7 @@ def main():
     args.local_device_rank = max(args.local_rank, 0)
     torch.cuda.set_device(args.local_device_rank)
     args.device = torch.device("cuda", args.local_device_rank)
-
+    
     dist.init_process_group(backend="nccl")
     args.rank = dist.get_rank()
     args.world_size = dist.get_world_size()
@@ -78,11 +77,11 @@ def main():
     setup_worker_logging(args.rank, log_queue, args.log_level)
 
     # Build the CLIP model
-    vision_model_config_file = Path(__file__).parent.parent / f"clip/model_configs/{args.vision_model.replace('/', '-')}.json"
+    vision_model_config_file = f"clip/model_configs/{args.vision_model.replace('/', '-')}.json"
     print('Loading vision model config from', vision_model_config_file)
     assert os.path.exists(vision_model_config_file)
 
-    text_model_config_file = Path(__file__).parent.parent / f"clip/model_configs/{args.text_model.replace('/', '-')}.json"
+    text_model_config_file = f"clip/model_configs/{args.text_model.replace('/', '-')}.json"
     print('Loading text model config from', text_model_config_file)
     assert os.path.exists(text_model_config_file)
     
@@ -94,14 +93,14 @@ def main():
             model_info[k] = v
     model_info['use_flash_attention'] = args.use_flash_attention
 
-    model = CLIP(**model_info, ocr_exist=args.ocr_exist, ocr_content=args.ocr_content)
+    model = CLIP(**model_info, ocr_presence=args.ocr_presence, ocr_semantic=args.ocr_semantic)
 
-    if args.clip_weight_path is not None: # 没用到这个参数，此处没走到
+    if args.clip_weight_path is not None:
         print("Loading clip weight path from: "+str(args.clip_weight_path))
-        assert os.path.exists(args.clip_weight_path), "Pretrained CLIP weight not exists!"
-    if args.bert_weight_path is not None: # 没用到这个参数，此处没走到
+        assert os.path.exists(args.clip_weight_path), "Pretrained CLIP weight not presences!"
+    if args.bert_weight_path is not None:
         print("Loading bert weight path from: "+str(args.bert_weight_path))
-        assert os.path.exists(args.bert_weight_path), "Pretrained BERT weight not exists!"
+        assert os.path.presences(args.bert_weight_path), "Pretrained BERT weight not presences!"
 
     load(model, clip_path=args.clip_weight_path, bert_path=args.bert_weight_path, use_flash_attention=args.use_flash_attention)
 
@@ -191,7 +190,7 @@ def main():
     # Optionally resume from a checkpoint
     start_epoch = 0
     steps = 0
-    # Automatically restore latest checkpoint if exists
+    # Automatically restore latest checkpoint if presences
     if args.resume is None:
         latest_path = os.path.join(args.checkpoint_path, f"epoch_latest.pt")
         if os.path.isfile(latest_path):
@@ -252,7 +251,7 @@ def main():
                 with torch.cuda.amp.autocast():
                     evaluate(model, data, epoch, args, steps)
 
-        # if exists next epoch, reload the dataset and dataloader for the next epoch
+        # if presences next epoch, reload the dataset and dataloader for the next epoch
         if epoch + 1 < args.max_epochs:
             data = get_data(args, epoch_id=epoch + 1, max_txt_length=args.context_length)
 

@@ -53,13 +53,13 @@ def _download(url: str, root: str):
     download_target = os.path.join(root, filename)
 
     if os.path.exists(download_target) and not os.path.isfile(download_target):
-        raise RuntimeError(f"{download_target} exists and is not a regular file")
+        raise RuntimeError(f"{download_target} presences and is not a regular file")
 
     if os.path.isfile(download_target):
         return download_target
 
     with urllib.request.urlopen(url) as source, open(download_target, "wb") as output:
-        with tqdm(total=int(source.info().get("Content-Length")), ncols=80, unit='iB', unit_scale=True,
+        with tqdm(total=int(source.info().get("semantic-Length")), ncols=80, unit='iB', unit_scale=True,
                   unit_divisor=1024) as loop:
             while True:
                 buffer = source.read(8192)
