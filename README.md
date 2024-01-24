@@ -1,5 +1,5 @@
 [**中文说明**](README.md) | [**English**](README_EN.md)  | [**Paper**](https://arxiv.org/abs/2401.10475)
-<br><br>
+<br>
 
 # 导航
 - [导航](#导航)
@@ -11,17 +11,17 @@
   - [依赖环境](#依赖环境)
   - [使用教程](#使用教程)
 
-<br><br>
+<br>
 
 # 项目介绍
 
 本项目为填补短视频封面数据的空白，建立了首个针对中文短视频搜索场景的大规模封面文本基准，并提出了用于封面图文对比学习的UniCLIP。本项目代码基于<b>[QA-CLIP](https://github.com/TencentARC-QQ/QA-CLIP)</b>建设，并在<b>[大规模中文短视频封面数据](#数据集)</b>上微调。UniCLIP已被部署到<b>[QQ浏览器](https://browser.qq.com/mobile)</b>在线搜索业务中，并取得了显著的收益。详细的技术细节，请参阅我们的<b>[论文](https://arxiv.org/abs/2401.10475)</b>。
-<br><br>
+<br>
 
 
 # 最新发布
 * 2024.1.23 [CBVS数据集与UniCLIP项目正式开源](https://github.com/QQBrowserVideoSearch/CBVS-UniCLIP)
-<br><br>
+<br>
 
 # 数据集
 CBVS数据集目前可通过<b>[Google Drive](https://drive.google.com/drive/folders/1c4WUzK-s9e2zgcqq_L7jp_CL5Z_YePWh?usp=sharing)</b>或<b>[百度网盘](https://pan.baidu.com/s/1DFP9derk_Twyls4H_o41JQ?pwd=n5uw)</b>下载。CBVS包括三个版本：20K/5M/10M，各版本的具体细节见下表：
@@ -40,7 +40,7 @@ CBVS数据集目前可通过<b>[Google Drive](https://drive.google.com/drive/fol
         <td>CBVS-10M</sub></td><td>10,075,989</td><td>无</td><td>短视频封面</td><td>短视频标题、OCR文本</td><td>预训练、微调</td>
     </tr>
 </table>
-<br><br>
+<br>
 
 # 模型及实验
 ## 模型规模 & 下载链接
@@ -54,7 +54,7 @@ UniCLIP目前开源1个规模，其模型信息和下载方式见下表：
         <td>UniCLIP<sub>ViT-B/16</sub></td><td><a href="https://github.com/TencentARC-QQ/QA-CLIP">QA-CLIP</a></td><td>CBVS-5M</td><td><a href="https://drive.google.com/file/d/1I-aoQ6qaUZ0IrU0o29pBhPTG8LFHLsnJ/view?usp=sharing">Google Drive</a>/<a href="https://pan.baidu.com/s/1EV5BdwnW4FuGWaXRkDQdlA?pwd=7wkp">百度网盘</a></td><td>188M</td><td>ViT-B/16</td><td>86M</td><td>RoBERTa-wwm-Base</td><td>102M</td><td>224</td>
     </tr>
 </table>
-<br><br>
+<br>
 
 ## 实验结果
 我们在CBVS-20K数据集上测试了以下模型的zero-shot与微调结果。
@@ -146,7 +146,7 @@ CBVS-UniCLIP
 │   └── training                 # 训练相关代码
 └── inference.py                 # UniCLIP推理示例
 ```
-<br><br>
+<br>
 
 # 依赖环境
 开始本项目前，需先检查是否满足下列环境配置要求:
@@ -160,7 +160,7 @@ CBVS-UniCLIP
 ```bash
 pip install -r requirements.txt
 ```
-<br><br>
+<br>
 
 
 # 使用教程
@@ -285,7 +285,7 @@ bash run_scripts/eval_vit_b.sh
 ```python
 score = compute_feature(model, query='大宅门演员表', url='http://puui.qpic.cn/vpic_cover/h0871hjdde8/h0871hjdde8_hz.jpg/640', compute_score=True)
 ```
-<br><br>
+<br>
 
 
 # 引用
