@@ -181,7 +181,7 @@ CBVS-UniCLIP
 ├── datasets                     # 数据集存放路径
 │   ├── cbvs20k.txt              # CBVS-20K数据集，用于测试
 │   ├── cbvs5m.txt               # CBVS-5M数据集，用于训练
-│   ├── cbvs10m.txt              # CBVS-5M数据集，用于训练
+│   ├── cbvs10m.txt              # CBVS-10M数据集，用于训练
 │   └── cbvs10m-HNSW             # HNSW算法所需的数据文件
 ```
 
@@ -273,7 +273,7 @@ bash run_scripts/eval_vit_b.sh
 
 与此同时，脚本将计算并输出模型的排序指标，包括PNR、NDCG与MAP。
 
-**注意**: 推理与训练脚本中的推理配置项需保持一致。
+**注意**: 推理与训练脚本中的配置项需保持一致。
 
 
 ### 单条数据预测
