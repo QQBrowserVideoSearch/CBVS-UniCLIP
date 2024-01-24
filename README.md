@@ -160,12 +160,12 @@ pip install -r requirements.txt
 
 ### 预训练CKPT
 
-请参考前文[模型及实验](##模型及实验)部分，下载对应模型ckpt。推荐将下载的ckpt文件存放于`CBVS-UniCLIP/pretrained/`目录下。
+请参考前文[模型及实验](#模型及实验)部分，下载对应模型ckpt。推荐将下载的ckpt文件存放于`CBVS-UniCLIP/pretrained/`目录下。
 <br>
 
 ### 数据集
 
-请参考前文[数据集](##数据集)部分，下载CBVS数据集。推荐将下载的数据集存放于`CBVS-UniCLIP/datasets/`目录下，推荐的组织结构为：
+请参考前文[数据集](#数据集)部分，下载CBVS数据集。推荐将下载的数据集存放于`CBVS-UniCLIP/datasets/`目录下，推荐的组织结构为：
 
 ```
 CBVS-UniCLIP
