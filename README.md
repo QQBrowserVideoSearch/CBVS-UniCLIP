@@ -3,13 +3,12 @@
 
 <p align="center">
     <br>
-    <img src="assets/logo.svg" width="400" />
+    <img src="assets/logo.svg" width="350" />
 <p>
 
 <p align="center">
         <a href="https://github.com/QQBrowserVideoSearch/CBVS-UniCLIP">Code</a>&nbsp ｜ &nbsp<a href="https://arxiv.org/abs/2401.10475">Paper</a>
 </p>
-<br><br>
 
 # 导航
 - [导航](#导航)
