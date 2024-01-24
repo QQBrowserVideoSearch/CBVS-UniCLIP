@@ -1,5 +1,15 @@
-[**中文说明**](README.md) | [**English**](README_EN.md)  | [**Paper**](https://arxiv.org/abs/2401.10475)
+[**中文说明**](README.md) | [**English**](README_EN.md)
 <br>
+
+<p align="center">
+    <br>
+    <img src="assets/logo.svg" width="400" />
+<p>
+
+<p align="center">
+        <a href="https://github.com/QQBrowserVideoSearch/CBVS-UniCLIP">Code</a>&nbsp ｜ &nbsp<a href="https://arxiv.org/abs/2401.10475">Paper</a>
+</p>
+<br><br>
 
 # 导航
 - [导航](#导航)
