@@ -45,7 +45,6 @@ report_training_batch_acc="--report-training-batch-acc"
 context_length=12
 warmup=100
 batch_size=180
-valid_batch_size=180
 accum_freq=1
 lr=2e-5
 wd=0.001 # weight delay

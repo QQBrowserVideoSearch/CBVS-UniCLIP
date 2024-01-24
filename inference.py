@@ -89,7 +89,7 @@ if __name__ == '__main__':
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"device:{device}")
 
-    model_path = 'pretrained/UniCLIP-base.pt'
+    model_path = 'pretrained/UniCLIP-base-QA-CLIP-5M.pt'
 
     model, preprocess = load_model(ocr_presence=1, ocr_semantic=1, model_path=model_path, device=device, 
                                    vision_model="ViT-B-16",text_model="RoBERTa-wwm-ext-base-chinese", 

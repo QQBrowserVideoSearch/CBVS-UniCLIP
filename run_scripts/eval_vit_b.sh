@@ -3,7 +3,7 @@
 test_data=datasets/cbvs20k.txt
 
 # restore options
-resume=pretrained/UniCLIP-base.pt
+resume=pretrained/UniCLIP-base-QA-CLIP-5M.pt
 
 # inference output
 output_file=output/inference_result.txt
